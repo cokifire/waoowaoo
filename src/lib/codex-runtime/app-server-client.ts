@@ -40,6 +40,24 @@ const DEFAULT_ARGS = [
 ] as const
 const DEFAULT_SHUTDOWN_TIMEOUT_MS = 2_000
 
+/**
+ * Kill a Windows process tree.
+ *
+ * A shell-launched app-server is a `cmd.exe` wrapper around the real Codex
+ * process, so terminating the child alone orphans Codex and every tool it
+ * spawned. `taskkill /T` is the only stock way to reap the whole tree.
+ */
+function killWindowsProcessTree(pid: number): Promise<void> {
+  return new Promise((resolve) => {
+    const killer = spawn('taskkill', ['/PID', String(pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    })
+    killer.once('error', () => resolve())
+    killer.once('exit', () => resolve())
+  })
+}
+
 type PendingRequest = {
   readonly method: string
   readonly resolve: (value: RuntimeJsonValue) => void
@@ -325,7 +343,13 @@ export class CodexAppServerClient implements RuntimeAdapter {
       cwd: options.cwd,
       env: options.env ?? process.env,
       stdio: ['pipe', 'pipe', 'pipe'],
+      // Detached process groups do not exist on Windows.
       detached: process.platform !== 'win32',
+      // On Windows a globally npm-installed CLI resolves to a `.cmd`/`.ps1`
+      // shim, not a PE binary. Node cannot spawn those directly: the bare
+      // command fails with ENOENT and the explicit `.cmd` with EINVAL. The
+      // shell resolves the shim, so Windows local runtimes require it.
+      shell: process.platform === 'win32',
     })
     this.reader = createInterface({ input: this.child.stdout, crlfDelay: Infinity })
     this.reader.on('line', (line) => this.handleLine(line))
@@ -547,6 +571,8 @@ export class CodexAppServerClient implements RuntimeAdapter {
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error
       }
+    } else if (process.platform === 'win32' && typeof pid === 'number') {
+      await killWindowsProcessTree(pid)
     } else {
       this.child.kill('SIGKILL')
     }

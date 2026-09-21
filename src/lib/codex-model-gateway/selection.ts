@@ -1,5 +1,3 @@
-import { findBuiltinCapabilities } from '@/lib/ai-registry/capabilities-catalog'
-import { ensureAiCatalogsRegistered } from '@/lib/ai-exec/catalog-bootstrap'
 import { resolveLlmRuntimeModel } from '@/lib/ai-exec/llm-runtime'
 import { getUserModelConfig } from '@/lib/config-service'
 import { getProviderConfig } from '@/lib/user-api/runtime-config'
@@ -98,25 +96,6 @@ async function resolveSelectedAssistantModel(scope: CodexModelGatewayScope) {
   } catch {
     throw new CodexModelGatewayError('ASSISTANT_MODEL_UNSUPPORTED', 422)
   }
-  if (selection.provider !== 'openrouter') {
-    throw new CodexModelGatewayError(
-      'PROVIDER_RESPONSES_UNSUPPORTED',
-      422,
-    )
-  }
-  ensureAiCatalogsRegistered()
-  const codexRuntimeWireApi = findBuiltinCapabilities(
-    'llm',
-    selection.provider,
-    selection.modelId,
-  )?.llm?.codexRuntimeWireApi
-  if (codexRuntimeWireApi !== 'responses') {
-    throw new CodexModelGatewayError(
-      'PROVIDER_RESPONSES_UNSUPPORTED',
-      422,
-    )
-  }
-
   let providerConfig: Awaited<ReturnType<typeof getProviderConfig>>
   try {
     providerConfig = await getProviderConfig(

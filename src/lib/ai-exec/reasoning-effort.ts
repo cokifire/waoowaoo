@@ -43,7 +43,10 @@ export async function resolveReasoningEffort(input: {
   ensureAiCatalogsRegistered()
 
   const capabilities = resolveBuiltinCapabilitiesByModelKey('llm', input.modelKey)?.llm
-  if (!capabilities) throw new Error(`LLM_CAPABILITIES_REQUIRED:${input.modelKey}`)
+  // Bring-your-own-model providers, such as OpenAI Compatible, deliberately
+  // have no builtin catalog entry. Without a declared capability contract,
+  // do not send a provider-specific reasoning parameter.
+  if (!capabilities) return 'none'
   if (!capabilities.reasoningEffortOptions?.length) return 'none'
   const modelDefault = parseReasoningEffort(
     capabilities.defaultReasoningEffort,

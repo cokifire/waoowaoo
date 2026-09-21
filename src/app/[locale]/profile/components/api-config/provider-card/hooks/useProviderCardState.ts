@@ -257,19 +257,22 @@ export function useProviderCardState({
 
   /**
    * Ask the endpoint itself which models it serves, so the user never has to
-   * copy model ids by hand. Credentials come from the saved provider config
-   * unless the card carries a draft Base URL.
+   * copy model ids by hand. Credentials come from the saved provider config,
+   * but a Key typed into the card (and not yet saved) is sent directly so
+   * detection works without a prior save — matching how desktop clients behave.
    */
   const handleDiscoverModels = async (): Promise<void> => {
     if (isDiscoveringModels) return
     setIsDiscoveringModels(true)
     try {
+      const draftApiKey = tempKey.trim()
       const response = await apiFetch('/api/user/api-config/discover-models', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           providerId: provider.id,
           ...(provider.baseUrl ? { baseUrl: provider.baseUrl } : {}),
+          ...(draftApiKey ? { apiKey: draftApiKey } : {}),
         }),
       })
       if (!response.ok) {

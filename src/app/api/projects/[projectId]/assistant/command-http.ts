@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server'
+import { createScopedLogger } from '@/lib/logging/core'
 import { ApiError, normalizeError } from '@/lib/api-errors'
 import { AssistantRuntimeProjectBusyError } from '@/lib/assistant-runtime'
 import { InsufficientBalanceError } from '@/lib/billing'
@@ -234,6 +235,15 @@ export function mapProjectAgentCommandError(error: unknown): ApiError {
     }
   }
 
+  // This is the only branch that reports a runtime failure without a
+  // classified code, so the captured evidence has to be persisted here: the
+  // generic code alone collapses every unknown cause into one unrecoverable
+  // user message and leaves the logs without a root cause.
+  createScopedLogger({ module: 'assistant' }).error({
+    action: 'assistant.command.unclassified_failure',
+    message: 'project agent command failed with an unclassified error',
+    details: { evidence: collectErrorText(error).slice(0, 1000) },
+  })
   const runtimeError = new ApiError('EXTERNAL_ERROR', {
     code: 'PROJECT_AGENT_RUNTIME_FAILED',
     message: 'PROJECT_AGENT_RUNTIME_FAILED',
