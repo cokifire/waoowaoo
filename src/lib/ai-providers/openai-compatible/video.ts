@@ -96,8 +96,8 @@ async function readInputReference(imageUrl: string): Promise<{ blob: Blob; filen
       method: 'GET',
       signal: AbortSignal.timeout(OPENAI_COMPATIBLE_VIDEO_SOURCE_TIMEOUT_MS),
     })
-  } catch {
-    throw new Error('OPENAI_COMPATIBLE_VIDEO_INPUT_REFERENCE_UNREACHABLE')
+  } catch (cause) {
+    throw new Error('OPENAI_COMPATIBLE_VIDEO_INPUT_REFERENCE_UNREACHABLE', { cause })
   }
   if (!response.ok) {
     throw new Error(`OPENAI_COMPATIBLE_VIDEO_INPUT_REFERENCE_FETCH_FAILED:${response.status}`)

@@ -111,11 +111,11 @@ export async function discoverProviderModels(input: {
         Accept: 'application/json',
       },
     })
-  } catch {
+  } catch (cause) {
     throw new ApiError('NETWORK_ERROR', {
       code: 'MODEL_DISCOVERY_UNREACHABLE',
       field: 'baseUrl',
-    })
+    }, { cause })
   }
 
   if (!response.ok) throwForStatus(response.status)
