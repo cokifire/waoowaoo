@@ -1,6 +1,6 @@
 'use client'
 
-import type { CSSProperties, ReactNode } from 'react'
+import type { CSSProperties, FormEvent, ReactNode } from 'react'
 import { useCallback, useMemo, useState } from 'react'
 import {
   DndContext,
@@ -32,6 +32,8 @@ interface ApiConfigProviderListProps {
   defaultModels: DefaultModels
   getModelsForProvider: (providerId: string) => CustomModel[]
   onUpdateApiKey: (providerId: string, apiKey: string) => void
+  onUpdateBaseUrl: (providerId: string, baseUrl: string) => void
+  onAddProviderInstance: (baseProviderId: string, name: string) => void
   onReorderProviders: (activeProviderId: string, overProviderId: string) => void
   onDeleteModel: (modelKey: string, providerId: string) => void
   onUpdateModel: (modelKey: string, updates: Partial<CustomModel>, providerId: string) => void
@@ -42,6 +44,11 @@ interface ApiConfigProviderListProps {
     providerPoolHint: string
     dragToSort: string
     moreProviders: string
+    instanceHint: string
+    instanceNamePlaceholder: string
+    addInstance: string
+    save: string
+    cancel: string
   }
 }
 
@@ -50,6 +57,25 @@ export function ApiConfigProviderList(props: ApiConfigProviderListProps) {
   const { modelProviders, allModels, getModelsForProvider, labels } = props
   const [expandedProviderId, setExpandedProviderId] = useState<string | null>(null)
   const [showMoreProviders, setShowMoreProviders] = useState(false)
+  const [instanceFormFor, setInstanceFormFor] = useState<string | null>(null)
+  const [instanceName, setInstanceName] = useState('')
+
+  // Catalog providers that let the user bring their own endpoint can be
+  // instantiated more than once (one gateway each).
+  const instanceBaseProviders = useMemo(
+    () => modelProviders.filter((provider) => (
+      provider.supportsCustomBaseUrl === true && !provider.id.includes(':')
+    )),
+    [modelProviders],
+  )
+
+  const submitInstance = useCallback((event: FormEvent) => {
+    event.preventDefault()
+    if (!instanceFormFor || !instanceName.trim()) return
+    props.onAddProviderInstance(instanceFormFor, instanceName)
+    setInstanceFormFor(null)
+    setInstanceName('')
+  }, [instanceFormFor, instanceName, props])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -80,6 +106,7 @@ export function ApiConfigProviderList(props: ApiConfigProviderListProps) {
       expanded={expandedProviderId === provider.id}
       onExpandChange={(expanded) => setExpandedProviderId(expanded ? provider.id : null)}
       onUpdateApiKey={props.onUpdateApiKey}
+      onUpdateBaseUrl={props.onUpdateBaseUrl}
       onDeleteModel={(modelKey) => props.onDeleteModel(modelKey, provider.id)}
       onUpdateModel={(modelKey, updates) => props.onUpdateModel(modelKey, updates, provider.id)}
       onDeleteProvider={props.onDeleteProvider}
@@ -125,6 +152,50 @@ export function ApiConfigProviderList(props: ApiConfigProviderListProps) {
               </div>
             ))}
           </>
+        )}
+        {instanceBaseProviders.length > 0 && (
+          <div className="border-t border-[var(--glass-stroke-base)] px-3 py-2.5">
+            {instanceFormFor === null ? (
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[12px] text-[var(--glass-text-tertiary)]">{labels.instanceHint}</span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {instanceBaseProviders.map((baseProvider) => (
+                    <button
+                      key={baseProvider.id}
+                      type="button"
+                      onClick={() => { setInstanceFormFor(baseProvider.id); setInstanceName('') }}
+                      className="glass-btn-base glass-btn-soft px-2.5 py-1.5 text-[12px]"
+                    >
+                      <AppIcon name="plus" className="h-3.5 w-3.5" />
+                      {labels.addInstance}: {baseProvider.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <form className="flex flex-wrap items-center gap-2" onSubmit={submitInstance}>
+                <input
+                  value={instanceName}
+                  onChange={(event) => setInstanceName(event.target.value)}
+                  placeholder={labels.instanceNamePlaceholder}
+                  aria-label={labels.instanceNamePlaceholder}
+                  className="glass-input-base min-w-0 flex-1 px-3 py-1.5 text-xs"
+                  autoFocus
+                />
+                <button type="submit" disabled={!instanceName.trim()} className="glass-btn-base glass-btn-primary px-3 py-1.5 text-[12px]">
+                  {labels.save}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setInstanceFormFor(null); setInstanceName('') }}
+                  className="glass-icon-btn-sm"
+                  aria-label={labels.cancel}
+                >
+                  <AppIcon name="close" className="h-4 w-4" />
+                </button>
+              </form>
+            )}
+          </div>
         )}
       </div>
     </div>

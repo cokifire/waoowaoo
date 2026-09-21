@@ -1,16 +1,84 @@
 'use client'
 
+import { useState } from 'react'
 import type { ProviderCardProps, ProviderCardTranslator } from './types'
 import type { UseProviderCardStateResult } from './hooks/useProviderCardState'
+import { useToast } from '@/contexts/ToastContext'
 import { AppIcon } from '@/components/ui/icons'
 
 interface ProviderBaseFieldsProps {
   provider: ProviderCardProps['provider']
   t: ProviderCardTranslator
   state: UseProviderCardStateResult
+  onUpdateBaseUrl?: ProviderCardProps['onUpdateBaseUrl']
 }
 
-export function ProviderBaseFields({ provider, t, state }: ProviderBaseFieldsProps) {
+function isValidHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+/** Bring-your-own-endpoint providers (no preset URL) edit their Base URL here. */
+function ProviderBaseUrlField({
+  provider,
+  t,
+  onUpdateBaseUrl,
+}: {
+  provider: ProviderCardProps['provider']
+  t: ProviderCardTranslator
+  onUpdateBaseUrl?: ProviderCardProps['onUpdateBaseUrl']
+}) {
+  const { showToast } = useToast()
+  const [value, setValue] = useState(provider.baseUrl ?? '')
+  const [syncedUrl, setSyncedUrl] = useState(provider.baseUrl ?? '')
+
+  // Re-sync the draft when the saved URL changes externally; adjusting state
+  // during render avoids the cascading render of a setState-in-effect.
+  if (syncedUrl !== (provider.baseUrl ?? '')) {
+    setSyncedUrl(provider.baseUrl ?? '')
+    setValue(provider.baseUrl ?? '')
+  }
+
+  const commit = () => {
+    if (!onUpdateBaseUrl) return
+    const next = value.trim()
+    if (next === (provider.baseUrl ?? '')) return
+    if (next && !isValidHttpUrl(next)) {
+      showToast(t('baseUrlInvalid'), 'warning')
+      setValue(provider.baseUrl ?? '')
+      return
+    }
+    onUpdateBaseUrl(provider.id, next)
+  }
+
+  return (
+    <div className="glass-surface-soft mt-2 flex items-center gap-3 rounded-xl px-3 py-2">
+      <span className="shrink-0 text-xs font-medium text-[var(--glass-text-secondary)]">
+        {t('baseUrlLabel')}
+      </span>
+      <input
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            commit()
+          }
+        }}
+        placeholder={t('baseUrlPlaceholder')}
+        aria-label={t('baseUrlLabel')}
+        className="glass-input-base min-w-0 flex-1 px-3 py-1.5 font-mono text-xs"
+      />
+    </div>
+  )
+}
+
+export function ProviderBaseFields({ provider, t, state, onUpdateBaseUrl }: ProviderBaseFieldsProps) {
   return (
     <div className="px-4 pt-3">
       <div className="glass-surface-soft flex items-center gap-3 rounded-xl px-3 py-2">
@@ -51,6 +119,9 @@ export function ProviderBaseFields({ provider, t, state }: ProviderBaseFieldsPro
           </div>
         )}
       </div>
+      {provider.supportsCustomBaseUrl && (
+        <ProviderBaseUrlField provider={provider} t={t} onUpdateBaseUrl={onUpdateBaseUrl} />
+      )}
     </div>
   )
 }

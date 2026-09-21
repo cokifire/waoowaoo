@@ -42,12 +42,14 @@ export function mergeProvidersForDisplay(
     seenProviderIds.add(savedProvider.id)
 
     const providerKey = getProviderKey(savedProvider.id)
-    const matchedPreset = presetProviders.find((presetProvider) => presetProvider.id === providerKey)
-    if (matchedPreset) {
+    const familyPreset = presetProviders.find((presetProvider) => presetProvider.id === providerKey)
+
+    // The saved entry *is* the catalog provider: the catalog owns its identity.
+    if (familyPreset && familyPreset.id === savedProvider.id) {
       merged.push({
-        ...matchedPreset,
+        ...familyPreset,
         hasApiKey: savedProvider.hasApiKey === true,
-        baseUrl: savedProvider.baseUrl || matchedPreset.baseUrl,
+        baseUrl: savedProvider.baseUrl || familyPreset.baseUrl,
       })
       seenPresetKeys.add(providerKey)
       continue
@@ -55,6 +57,17 @@ export function mergeProvidersForDisplay(
 
     merged.push({
       ...savedProvider,
+      // A user-created instance owns its id, name and endpoint, but inherits the
+      // family capability declaration so its card offers the same model types,
+      // Base URL field and model detection as the catalog provider.
+      ...(familyPreset
+        ? {
+          modelTypes: familyPreset.modelTypes,
+          supportsCustomBaseUrl: familyPreset.supportsCustomBaseUrl,
+          modelDiscovery: familyPreset.modelDiscovery,
+          connectionTest: familyPreset.connectionTest,
+        }
+        : {}),
       apiKey: undefined,
       hasApiKey: savedProvider.hasApiKey === true,
     })
@@ -70,6 +83,36 @@ export function mergeProvidersForDisplay(
   }
 
   return merged
+}
+
+const INSTANCE_SLUG_MAX_LENGTH = 32
+
+/**
+ * Instance ids must stay URL/model-key safe: a model key is
+ * `provider:instance::modelId`, so the slug may not contain `:` or whitespace.
+ * A non-latin display name degrades to a numbered instance instead of a
+ * mangled slug.
+ */
+export function buildProviderInstanceId(input: {
+  baseProviderId: string
+  name: string
+  existingIds: ReadonlySet<string>
+}): string {
+  const slug = input.name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, INSTANCE_SLUG_MAX_LENGTH)
+  const baseSlug = slug || 'instance'
+
+  let candidate = `${input.baseProviderId}:${baseSlug}`
+  let counter = 2
+  while (input.existingIds.has(candidate)) {
+    candidate = `${input.baseProviderId}:${baseSlug}-${counter}`
+    counter += 1
+  }
+  return candidate
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

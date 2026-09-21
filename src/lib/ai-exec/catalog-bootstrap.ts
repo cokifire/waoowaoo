@@ -1,10 +1,12 @@
 import {
   listBuiltinApiConfigCatalogModels,
   listBuiltinCapabilityCatalogEntries,
+  listBuiltinLlmProtocolFallbacks,
   listBuiltinPricingCatalogEntries,
 } from '@/lib/ai-providers/builtin-catalog'
 import { registerBuiltinApiConfigCatalog } from '@/lib/ai-registry/api-config-catalog'
 import { registerBuiltinCapabilityCatalogEntries } from '@/lib/ai-registry/capabilities-catalog'
+import { registerBuiltinLlmProtocolFallbacks } from '@/lib/ai-registry/llm-protocol-fallback'
 import { registerBuiltinPricingCatalogEntries } from '@/lib/ai-registry/pricing-catalog'
 import { assertEverySelectableModelIsPriced } from '@/lib/ai-registry/pricing-coverage'
 
@@ -13,6 +15,7 @@ let registered = false
 export function ensureAiCatalogsRegistered() {
   if (registered) return
   registerBuiltinCapabilityCatalogEntries(listBuiltinCapabilityCatalogEntries())
+  registerBuiltinLlmProtocolFallbacks(listBuiltinLlmProtocolFallbacks())
   registerBuiltinPricingCatalogEntries(listBuiltinPricingCatalogEntries())
   registerBuiltinApiConfigCatalog({
     models: listBuiltinApiConfigCatalogModels(),

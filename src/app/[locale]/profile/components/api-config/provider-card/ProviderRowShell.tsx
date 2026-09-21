@@ -31,6 +31,7 @@ export function ProviderRowShell({
   children,
 }: ProviderRowShellProps) {
   const configured = !!provider.hasApiKey
+    && (!provider.supportsCustomBaseUrl || !!provider.baseUrl)
   return (
     <div className="border-b border-[var(--glass-stroke-base)] last:border-b-0">
       <div className="flex items-center gap-3 px-3 py-2.5">

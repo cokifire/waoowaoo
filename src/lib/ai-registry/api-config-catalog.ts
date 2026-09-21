@@ -4,6 +4,7 @@ import { resolveBuiltinCapabilitiesByModelKey } from './capabilities-catalog'
 import { cloneCapabilities, isPlainObject, isUnifiedModelType, readTrimmedString } from './catalog-utils'
 import { AI_PROVIDER_MANIFESTS, isFeaturedApiConfigProvider } from '@/lib/ai-providers/manifests'
 import { isProductionModelSupported } from './media-model-selection'
+import { supportsModelDiscovery } from './model-discovery-support'
 
 // -----------------------------
 // API config server catalog
@@ -16,6 +17,10 @@ export interface ApiConfigCatalogProvider {
   featured: boolean
   connectionTest: boolean
   modelTypes: UnifiedModelType[]
+  /** True when the user must supply the endpoint themselves (no preset URL). */
+  supportsCustomBaseUrl: boolean
+  /** True when the endpoint can list its models, so the UI offers detection. */
+  modelDiscovery: boolean
 }
 
 export interface ApiConfigCatalogModel {
@@ -59,8 +64,11 @@ export function listApiConfigCatalogProviders(): ApiConfigCatalogProvider[] {
         featured: isFeaturedApiConfigProvider(manifest.providerKey),
         connectionTest: Boolean(manifest.adapter.connectionTest),
         modelTypes: Array.from(new Set(
-          manifest.catalogs.apiConfigModels.map((model) => model.type),
+          manifest.apiConfig.supportedModelTypes
+            ?? manifest.catalogs.apiConfigModels.map((model) => model.type),
         )),
+        supportsCustomBaseUrl: !manifest.apiConfig.baseUrl,
+        modelDiscovery: supportsModelDiscovery(manifest.providerKey),
       }]
     : [])
 }
@@ -189,6 +197,7 @@ export function matchesApiConfigModelKey(key: string | undefined | null, provide
 
 const ZH_PROVIDER_NAME_MAP: Readonly<Record<string, string>> = {
   ark: '火山引擎 Ark',
+  'openai-compatible': 'OpenAI 兼容',
 }
 
 function isZhLocale(locale?: string): boolean {

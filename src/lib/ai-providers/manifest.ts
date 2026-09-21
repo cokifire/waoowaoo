@@ -3,7 +3,7 @@ import type { AsyncTaskProviderRegistration } from '@/lib/ai-providers/async-tas
 import type { ProviderMediaInputTransport } from '@/lib/deployment/config'
 import type { PlatformModelPreset } from '@/lib/platform-models/types'
 import type { ApiConfigCatalogModel } from '@/lib/ai-registry/api-config-catalog'
-import type { UnifiedModelType } from '@/lib/ai-registry/types'
+import type { AiLlmProtocol, UnifiedModelType } from '@/lib/ai-registry/types'
 import type { PricingApiType } from '@/lib/ai-registry/pricing-catalog'
 
 export type ProviderMediaInputKind = 'image' | 'audio' | 'video'
@@ -41,11 +41,22 @@ export interface AiProviderManifest {
     readonly visibility: 'visible' | 'hidden'
     readonly name: string
     readonly baseUrl?: string
+    /**
+     * Model types users may attach to this provider. Derived from
+     * `catalogs.apiConfigModels` when omitted; declare it explicitly for
+     * bring-your-own-model providers whose catalog is intentionally empty.
+     */
+    readonly supportedModelTypes?: readonly UnifiedModelType[]
   }
   readonly platformCredentials?: {
     readonly envPrefix: string
     readonly requiresBaseUrl?: boolean
   }
+  /**
+   * Protocol applied to any model of this provider that has no builtin
+   * capability catalog entry. Required for bring-your-own-model providers.
+   */
+  readonly defaultLlmProtocol?: AiLlmProtocol
   readonly asyncTasks?: readonly AsyncTaskProviderRegistration[]
   readonly catalogs: {
     readonly capabilities: readonly ProviderCapabilityCatalogDeclaration[]

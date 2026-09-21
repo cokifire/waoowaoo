@@ -44,7 +44,11 @@ export function useApiConfigFilters({ providers, models, defaultModels }: UseApi
 
   const modelProviders = useMemo(() => {
     const modelProviderIds = new Set(models.map((model) => model.provider))
-    return providers.filter((provider) => modelProviderIds.has(provider.id))
+    // Catalog providers without preset models (e.g. bring-your-own-endpoint)
+    // must still render, otherwise there is nowhere to add their first model.
+    return providers.filter((provider) => modelProviderIds.has(provider.id)
+      || provider.featured === true
+      || provider.supportsCustomBaseUrl === true)
   }, [models, providers])
 
   /** Every model of a type, providers holding a key first so the pickable ones lead. */

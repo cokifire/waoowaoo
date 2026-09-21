@@ -17,6 +17,8 @@ export interface ApiConfigCatalogProvider {
     featured: boolean
     connectionTest: boolean
     modelTypes: UnifiedModelType[]
+    supportsCustomBaseUrl?: boolean
+    modelDiscovery?: boolean
 }
 
 export interface ApiConfigCatalogModel {
@@ -42,6 +44,8 @@ export interface Provider {
     featured?: boolean
     connectionTest?: boolean
     modelTypes?: UnifiedModelType[]
+    supportsCustomBaseUrl?: boolean
+    modelDiscovery?: boolean
 }
 
 // 模型接口
@@ -115,6 +119,7 @@ const ZH_PROVIDER_NAME_MAP: Record<string, string> = {
     google: 'Google',
     fal: 'FAL',
     openrouter: 'OpenRouter',
+    'openai-compatible': 'OpenAI 兼容',
 }
 
 function isZhLocale(locale?: string): boolean {

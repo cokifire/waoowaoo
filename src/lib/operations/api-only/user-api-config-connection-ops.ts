@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { testLlmConnection } from '@/lib/ai-exec/llm-test-connection'
+import { discoverProviderModels } from '@/lib/ai-exec/provider-model-discovery'
 import { testProviderConnection } from '@/lib/ai-exec/provider-test'
 import type { ProjectAgentOperationRegistryDraft } from '@/lib/operations/types'
 import { getProviderConfig } from '@/lib/user-api/runtime-config'
@@ -11,6 +12,12 @@ const providerDiagnosticInputSchema = z.object({
   apiKey: z.string().trim().min(1).optional(),
   baseUrl: z.string().trim().min(1).optional(),
   llmModel: z.string().trim().min(1).optional(),
+}).strict()
+
+const modelDiscoveryInputSchema = z.object({
+  providerId: z.string().trim().min(1),
+  apiKey: z.string().trim().min(1).optional(),
+  baseUrl: z.string().trim().min(1).optional(),
 }).strict()
 
 export function createUserApiConfigConnectionDiagnosticOperations(): ProjectAgentOperationRegistryDraft {
@@ -76,6 +83,45 @@ export function createUserApiConfigConnectionDiagnosticOperations(): ProjectAgen
           ...result,
           latencyMs: Date.now() - startedAt,
         }
+      },
+    },
+
+    api_user_api_config_discover_models: {
+      id: 'api_user_api_config_discover_models',
+      summary: 'API-only: List the models a user-configured provider endpoint exposes.',
+      intent: 'act',
+      effects: {
+        writes: false,
+        billable: false,
+        destructive: false,
+        overwrite: false,
+        bulk: false,
+        externalSideEffects: true,
+        longRunning: true,
+      },
+      inputSchema: modelDiscoveryInputSchema,
+      outputSchema: z.unknown(),
+      execute: async (ctx, input) => {
+        assertUserProviderConfigurationAvailable()
+        const parsed = modelDiscoveryInputSchema.parse(input)
+
+        // The client may pass a draft endpoint; otherwise the stored (decrypted)
+        // configuration is the source of truth. Missing pieces surface as
+        // PROVIDER_API_KEY_MISSING / PROVIDER_BASE_URL_MISSING.
+        let stored: Awaited<ReturnType<typeof getProviderConfig>> | null = null
+        if (!parsed.apiKey || !parsed.baseUrl) {
+          try {
+            stored = await getProviderConfig(ctx.userId, parsed.providerId)
+          } catch {
+            stored = null
+          }
+        }
+
+        const result = await discoverProviderModels({
+          apiKey: parsed.apiKey ?? stored?.apiKey ?? '',
+          baseUrl: parsed.baseUrl ?? stored?.baseUrl ?? '',
+        })
+        return { providerId: parsed.providerId, ...result }
       },
     },
   }

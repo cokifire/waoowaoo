@@ -18,6 +18,7 @@ import type { ApiConfigSaveError } from './editor'
 import { useUserApiConfigQuery } from './query'
 import { useToast } from '@/contexts/ToastContext'
 import {
+    buildProviderInstanceId,
     clearMissingDefaultModels,
     createInitialModels,
     createInitialProviders,
@@ -42,6 +43,8 @@ interface UseProvidersReturn {
     saveError: ApiConfigSaveError | null
     flushConfig: () => Promise<void>
     updateProviderApiKey: (providerId: string, apiKey: string) => void
+    updateProviderBaseUrl: (providerId: string, baseUrl: string) => void
+    addProviderInstance: (baseProviderId: string, name: string) => void
     reorderProviders: (activeProviderId: string, overProviderId: string) => void
     deleteProvider: (providerId: string) => void
     selectSlotModel: (type: UnifiedModelType, modelKey: string) => void
@@ -165,6 +168,48 @@ export function useProviders(): UseProvidersReturn {
             latestProvidersRef.current = settled
             setProviders(settled)
         })
+    }, [performSave])
+
+    const updateProviderBaseUrl = useCallback((providerId: string, baseUrl: string) => {
+        const next = latestProvidersRef.current.map((provider) => (
+            provider.id === providerId
+                ? { ...provider, baseUrl: baseUrl.trim() || undefined }
+                : provider
+        ))
+        latestProvidersRef.current = next
+        setProviders(next)
+        void performSave()
+    }, [performSave])
+
+    /**
+     * One endpoint per instance: several gateways can be configured side by side,
+     * each with its own Base URL and key, sharing only the family behaviour.
+     */
+    const addProviderInstance = useCallback((baseProviderId: string, name: string) => {
+        const trimmedName = name.trim()
+        if (!trimmedName) return
+        const current = latestProvidersRef.current
+        const baseProvider = current.find((provider) => provider.id === baseProviderId)
+        const next = [
+            ...current,
+            {
+                id: buildProviderInstanceId({
+                    baseProviderId,
+                    name: trimmedName,
+                    existingIds: new Set(current.map((provider) => provider.id)),
+                }),
+                name: trimmedName,
+                modelTypes: baseProvider?.modelTypes,
+                supportsCustomBaseUrl: baseProvider?.supportsCustomBaseUrl ?? true,
+                modelDiscovery: baseProvider?.modelDiscovery,
+                connectionTest: baseProvider?.connectionTest,
+                apiKey: '',
+                hasApiKey: false,
+            },
+        ]
+        latestProvidersRef.current = next
+        setProviders(next)
+        void performSave()
     }, [performSave])
 
     const reorderProviders = useCallback((activeProviderId: string, overProviderId: string) => {
@@ -340,6 +385,8 @@ export function useProviders(): UseProvidersReturn {
         saveError,
         flushConfig,
         updateProviderApiKey,
+        updateProviderBaseUrl,
+        addProviderInstance,
         reorderProviders,
         deleteProvider,
         selectSlotModel,
