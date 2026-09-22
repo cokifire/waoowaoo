@@ -2,9 +2,17 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js'
 import {
   CallToolRequestSchema,
   ElicitResultSchema,
+  ErrorCode,
+  ListResourcesRequestSchema,
+  ListResourceTemplatesRequestSchema,
   ListToolsRequestSchema,
+  McpError,
+  ReadResourceRequestSchema,
   type CallToolResult,
+  type ListResourcesResult,
+  type ListResourceTemplatesResult,
   type ListToolsResult,
+  type ReadResourceResult,
 } from '@modelcontextprotocol/sdk/types.js'
 import { normalizeOperationExecutionToolError } from '@/lib/adapters/operation-error-normalizer'
 import type { JsonObject } from '@/lib/operations/types'
@@ -100,7 +108,7 @@ export function createWaoMcpServer(
       version: params.version?.trim() || '0.1.0',
     },
     {
-      capabilities: { tools: {} },
+      capabilities: { tools: {}, resources: {} },
       instructions:
         'Wao project tools. Production schemas come from the canonical Operation registry; user decisions use the single Wao interaction contract.',
     },
@@ -112,6 +120,32 @@ export function createWaoMcpServer(
       return {
         tools: catalog.map((entry) => entry.tool),
       }
+    },
+  )
+
+  // Every project artifact is reached through a canonical Operation tool, so
+  // Wao owns no MCP resources. Answering the resource methods with empty
+  // catalogs keeps the runtime's built-in `list_mcp_resources` /
+  // `list_mcp_resource_templates` probes from failing with "Method not found",
+  // which reads like a wrong calling convention to the model and makes it burn
+  // turns probing alternative tool names instead of doing the work.
+  server.setRequestHandler(
+    ListResourcesRequestSchema,
+    async (): Promise<ListResourcesResult> => ({ resources: [] }),
+  )
+
+  server.setRequestHandler(
+    ListResourceTemplatesRequestSchema,
+    async (): Promise<ListResourceTemplatesResult> => ({ resourceTemplates: [] }),
+  )
+
+  server.setRequestHandler(
+    ReadResourceRequestSchema,
+    async (request): Promise<ReadResourceResult> => {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Unknown resource: ${request.params.uri}`,
+      )
     },
   )
 
