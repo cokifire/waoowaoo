@@ -33,6 +33,7 @@ export const openaiCompatibleProviderManifest = defineAiProviderManifest({
     platformModels: [],
   },
   mediaInputs: [
+    { modality: 'image', transports: { image: VISION_IMAGE_TRANSPORTS } },
     { modality: 'vision', transports: { image: VISION_IMAGE_TRANSPORTS } },
     { modality: 'video', transports: { image: VISION_IMAGE_TRANSPORTS } },
   ],

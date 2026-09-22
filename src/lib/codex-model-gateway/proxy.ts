@@ -24,6 +24,11 @@ import {
   failCodexProviderAttempt,
 } from './provider-attempt'
 import { observeCodexProviderSuccessResponse } from './provider-response-observer'
+import {
+  chatCompletionToResponsesStream,
+  responsesToChatCompletion,
+} from './chat-completions-bridge'
+import { getProviderKey } from '@/lib/ai-registry/selection'
 
 const CODEX_MODEL_REQUEST_MAX_BYTES = 16 * 1024 * 1024
 
@@ -369,6 +374,10 @@ export async function proxyCodexResponsesRequest(params: {
     upstreamModelId: upstream.modelId,
   })
   const { body } = providerRequest
+  const useChatCompletionsBridge = getProviderKey(upstream.provider).toLowerCase() === 'openai-compatible'
+  const outboundBody = useChatCompletionsBridge
+    ? Buffer.from(JSON.stringify(responsesToChatCompletion(modelRequest.parsed)), 'utf8')
+    : body
   const requestedAccept = params.request.headers.get('accept')?.toLowerCase()
     || ''
   const accept = requestedAccept.includes('text/event-stream')
@@ -382,7 +391,7 @@ export async function proxyCodexResponsesRequest(params: {
     providerKey: 'openrouter',
     modelKey: upstream.modelKey,
     requestHash: createHash('sha256')
-      .update(body)
+      .update(outboundBody)
       .update('\0', 'utf8')
       .update(accept, 'utf8')
       .digest('hex'),
@@ -404,17 +413,20 @@ export async function proxyCodexResponsesRequest(params: {
 
   let response: Response
   try {
-    response = await fetchWithProviderProxy(upstream.responsesEndpoint, {
+    response = await fetchWithProviderProxy(
+      useChatCompletionsBridge ? upstream.chatCompletionsEndpoint : upstream.responsesEndpoint,
+      {
       method: 'POST',
       headers: {
         Accept: accept,
         Authorization: `Bearer ${upstream.providerApiKey}`,
         'Content-Type': 'application/json',
       },
-      body: new Uint8Array(body),
+      body: new Uint8Array(outboundBody),
       redirect: 'error',
       signal: params.request.signal,
-    })
+      },
+    )
   } catch (error: unknown) {
     if (params.request.signal.aborted) {
       await cancelCodexProviderAttempt(providerAttempt)
@@ -465,6 +477,9 @@ export async function proxyCodexResponsesRequest(params: {
       contentLength: response.headers.get('content-length'),
     },
   })
+  if (useChatCompletionsBridge && response.ok) {
+    response = chatCompletionToResponsesStream(response, upstream.modelId)
+  }
   let projection: Awaited<ReturnType<typeof projectCodexProviderResponse>>
   try {
     projection = await projectCodexProviderResponse(response)

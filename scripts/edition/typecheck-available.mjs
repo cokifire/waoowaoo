@@ -1,9 +1,13 @@
 import { existsSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
+import process from 'node:process'
+
+const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 
 function runNpm(args, edition) {
-  const result = spawnSync('npm', args, {
+  const result = spawnSync(npmCommand, args, {
     stdio: 'inherit',
+    shell: process.platform === 'win32',
     env: edition ? { ...process.env, DEPLOYMENT_EDITION: edition } : process.env,
   })
   if (result.error) throw result.error

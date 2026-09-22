@@ -62,6 +62,12 @@ function buildResponsesEndpoint(baseUrl: string): string {
   return parsed.toString()
 }
 
+function buildChatCompletionsEndpoint(baseUrl: string): string {
+  const parsed = parseBaseUrl(baseUrl, 'PROVIDER_BASE_URL_INVALID')
+  parsed.pathname = `${parsed.pathname.replace(/\/+$/u, '')}/chat/completions`
+  return parsed.toString()
+}
+
 function buildRuntimeGatewayBaseUrl(runtimeReachableWaoBaseUrl: string): string {
   const parsed = parseBaseUrl(
     runtimeReachableWaoBaseUrl,
@@ -116,6 +122,7 @@ async function resolveSelectedAssistantModel(scope: CodexModelGatewayScope) {
     selection,
     providerApiKey: providerConfig.apiKey,
     responsesEndpoint: buildResponsesEndpoint(providerBaseUrl),
+    chatCompletionsEndpoint: buildChatCompletionsEndpoint(providerBaseUrl),
   }
 }
 
@@ -123,18 +130,22 @@ export async function resolveCodexModelGatewayUpstream(
   scopeValue: CodexModelGatewayScope,
 ): Promise<{
   readonly runtimeModelId: string
+  readonly provider: string
   readonly modelId: string
   readonly modelKey: string
   readonly responsesEndpoint: string
+  readonly chatCompletionsEndpoint: string
   readonly providerApiKey: string
 }> {
   const scope = normalizeCodexModelGatewayScope(scopeValue)
   const resolved = await resolveSelectedAssistantModel(scope)
   return {
     runtimeModelId: resolveCodexRuntimeModelId(resolved.selection.modelId),
+    provider: resolved.selection.provider,
     modelId: resolved.selection.modelId,
     modelKey: resolved.selection.modelKey,
     responsesEndpoint: resolved.responsesEndpoint,
+    chatCompletionsEndpoint: resolved.chatCompletionsEndpoint,
     providerApiKey: resolved.providerApiKey,
   }
 }

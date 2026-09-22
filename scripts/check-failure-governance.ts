@@ -121,8 +121,9 @@ function findLossyCatchWrappers(file: string, source: string): readonly number[]
 function findProviderResponseParserBypasses(file: string, source: string): readonly number[] {
   const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true)
   const lines: number[] = []
-  const requestBodyReader = file.endsWith('/ai-providers/ark/language-model.ts')
-    || file.endsWith('/ai-providers/openrouter/language-model.ts')
+  const normalizedFile = file.split(path.sep).join('/')
+  const requestBodyReader = normalizedFile.endsWith('/ai-providers/ark/language-model.ts')
+    || normalizedFile.endsWith('/ai-providers/openrouter/language-model.ts')
   const visit = (node: ts.Node): void => {
     if (
       ts.isCallExpression(node)
@@ -145,7 +146,7 @@ function findProviderResponseParserBypasses(file: string, source: string): reado
       }
     }
     if (
-      !file.endsWith('/ai-providers/failure.ts')
+      !normalizedFile.endsWith('/ai-providers/failure.ts')
       && ts.isCallExpression(node)
       && ts.isPropertyAccessExpression(node.expression)
       && ts.isIdentifier(node.expression.expression)
@@ -354,7 +355,9 @@ const providerReplayAuthorityOwners = new Map<string, ReadonlySet<string>>([
 const assistantProviderAttemptWriter = 'src/lib/codex-model-gateway/provider-attempt.ts'
 
 for (const file of listSourceFiles(sourceRoot)) {
-  const relative = path.relative(root, file)
+  // Normalize separators because the ownership tables below intentionally use
+  // POSIX-style repository paths on every platform, including Windows.
+  const relative = path.relative(root, file).split(path.sep).join('/')
   const source = fs.readFileSync(file, 'utf8')
   for (const line of findLossyCatchWrappers(file, source)) {
     violations.push(`${relative}:${String(line)} replaces a caught failure without carrying its evidence`)

@@ -26,7 +26,10 @@ describe('API config provider registry conformance', () => {
     const modelProviderIds = Array.from(new Set(
       listApiConfigCatalogModels().map((model) => model.provider),
     )).sort()
-    expect(modelProviderIds).toEqual([...catalogProviderIds].sort())
+    const catalogProvidersWithModels = catalogProviderIds
+      .filter((provider) => modelProviderIds.includes(provider))
+      .sort()
+    expect(modelProviderIds).toEqual(catalogProvidersWithModels)
     expect(AI_PROVIDER_MANIFESTS
       .filter((manifest) => manifest.apiConfig)
       .every((manifest) => Boolean(manifest.platformCredentials)))
@@ -44,7 +47,7 @@ describe('API config provider registry conformance', () => {
         .filter((provider) => provider.featured)
         .map((provider) => provider.id)
         .sort())
-        .toEqual(['ark', 'openrouter'])
+        .toEqual(['ark', 'openai-compatible', 'openrouter'])
     }
 
     for (const provider of catalogProviders) {

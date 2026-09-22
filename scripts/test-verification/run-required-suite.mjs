@@ -3,6 +3,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
+import process from 'node:process'
+
+const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx'
 
 function readOption(name) {
   const index = process.argv.indexOf(name)
@@ -36,10 +39,10 @@ function listTests(root) {
 
 const testFiles = roots.flatMap(listTests).sort()
 if (testFiles.length === 0) throw new Error(`Suite ${suite} discovered zero test files`)
-const vitest = spawnSync('npx', [
+const vitest = spawnSync(npxCommand, [
   'vitest', 'run', ...testFiles,
   '--reporter=default', '--reporter=json', `--outputFile=${report}`,
-], { stdio: 'inherit', env: process.env })
+], { stdio: 'inherit', env: process.env, shell: process.platform === 'win32' })
 
 const verify = spawnSync('node', [
   'scripts/test-verification/verify-vitest-report.mjs',
