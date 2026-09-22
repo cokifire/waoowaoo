@@ -58,6 +58,16 @@ const CASES: readonly ProviderFailureCase[] = [
     },
   },
   {
+    // A vendor that reports throttling as a 400 must still reach Codex as a
+    // retryable 429, or the turn dies as a permanent request rejection.
+    name: 'throttling-400',
+    status: 400,
+    error: { type: 'Throttling', code: 'Throttling.RateQuota' },
+    expected: {
+      responseTooManyFailedAttempts: { httpStatusCode: 429 },
+    },
+  },
+  {
     name: 'outage',
     status: 503,
     error: { type: 'server_error', code: 'provider_down' },

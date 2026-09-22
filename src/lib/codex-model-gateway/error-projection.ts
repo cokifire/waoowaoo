@@ -314,6 +314,36 @@ const PROVIDER_OVERLOAD_ERROR_TOKENS = new Set([
 ])
 
 /**
+ * Throttling is transient, but not every vendor reports it as a 429: an
+ * OpenAI-compatible endpoint can answer
+ * `{"error":{"type":"Throttling","code":"Throttling.RateQuota"}}` on HTTP 400.
+ * Projecting that as a request rejection tells the runtime not to retry and the
+ * user to revise an input that is blameless. Vendor codes are namespaced, so a
+ * token matches its family either exactly or by its leading namespace segment;
+ * classification stays on structured tokens and never on the natural-language
+ * diagnostic (`PG-19`).
+ */
+const PROVIDER_RATE_LIMIT_ERROR_TOKENS = new Set([
+  'rate_limit',
+  'rate_limit_error',
+  'rate_limit_exceeded',
+  'request_limit_exceeded',
+  'requests_rate_limit_exceeded',
+  'throttling',
+  'too_many_requests',
+])
+
+function hasProviderRateLimitToken(metadata: ProviderErrorMetadata): boolean {
+  return [metadata.code, metadata.type, metadata.errorType, metadata.providerCode].some(
+    (token) => typeof token === 'string'
+      && (
+        PROVIDER_RATE_LIMIT_ERROR_TOKENS.has(token)
+        || PROVIDER_RATE_LIMIT_ERROR_TOKENS.has(token.split('.')[0])
+      ),
+  )
+}
+
+/**
  * Project every Provider failure into the error vocabulary supported by the
  * pinned official Codex app-server. This is the sole Provider adaptation
  * boundary: no Runtime fork, terminal side channel, or message parsing is used.
@@ -382,14 +412,28 @@ export async function projectCodexProviderResponse(
       metadata,
     })
   }
-  if (providerStatus === 429) {
+  if (providerStatus === 429 || hasProviderRateLimitToken(metadata)) {
     return failedProjection({
-      response: projectTransparentProviderResponse(
-        response,
-        typeof metadata.source.errorEnvelope === 'string'
-          ? metadata.source.errorEnvelope
-          : JSON.stringify(metadata.source.errorEnvelope),
-      ),
+      // A rate limit is retryable, so the runtime must never see it under a
+      // status it reads as a permanent rejection: a vendor that throttles on
+      // HTTP 400 is answered with a canonical 429, which is what makes Codex
+      // back off and retry inside its own bounded retry budget instead of
+      // failing the turn. An already-429 Provider envelope is passed through
+      // so its own diagnostic, code, and `Retry-After` survive untouched.
+      response: providerStatus === 429
+        ? projectTransparentProviderResponse(
+            response,
+            typeof metadata.source.errorEnvelope === 'string'
+              ? metadata.source.errorEnvelope
+              : JSON.stringify(metadata.source.errorEnvelope),
+          )
+        : canonicalCodexErrorResponse({
+            source: response,
+            status: 429,
+            type: 'rate_limit_error',
+            code: 'rate_limit_exceeded',
+            message: metadata.message,
+          }),
       failureKind: 'rate_limited',
       providerStatus,
       providerCode,

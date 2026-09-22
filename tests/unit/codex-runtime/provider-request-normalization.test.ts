@@ -120,6 +120,13 @@ describe('Codex provider request normalization', () => {
       expectedCode: 'cyber_policy',
       expectedKind: 'policy_rejected',
     },
+    {
+      providerStatus: 400,
+      providerError: { type: 'Throttling', code: 'Throttling.RateQuota' },
+      expectedStatus: 429,
+      expectedCode: 'rate_limit_exceeded',
+      expectedKind: 'rate_limited',
+    },
   ])('projects Provider $providerStatus into the official Codex error vocabulary', async ({
     providerStatus,
     providerError,
@@ -213,6 +220,25 @@ describe('Codex provider request normalization', () => {
     expect(projected.failureKind).toBe('rate_limited')
     expect(projected.response.status).toBe(429)
     expect(projected.response.headers.get('retry-after')).toBe('12')
+  })
+
+  it('keeps a throttling envelope delivered on HTTP 400 retryable instead of rejecting the request', async () => {
+    const projected = await projectCodexProviderResponse(Response.json({
+      error: {
+        code: 'Throttling.RateQuota',
+        type: 'Throttling',
+        param: null,
+        message: 'Requests rate limit exceeded, please try again later.',
+      },
+      traceId: 'f1c2ba8b121543f39dc7d09d534efbfe',
+    }, { status: 400 }), 'openai-compatible')
+
+    expect(projected.failureKind).toBe('rate_limited')
+    expect(projected.providerStatus).toBe(400)
+    expect(projected.providerCode).toBe('throttling.ratequota')
+    expect(projected.failure?.interpretation.code).toBe('RATE_LIMIT')
+    expect(projected.response.status).toBe(429)
+    expect(await projected.response.text()).toContain('"code":"rate_limit_exceeded"')
   })
 
   it('keeps an unknown future JSON envelope unknown without losing its HTTP fact', async () => {
