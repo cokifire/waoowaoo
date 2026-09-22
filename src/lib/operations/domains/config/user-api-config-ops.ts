@@ -3,8 +3,15 @@ import { getUserApiConfig, putUserApiConfig } from '@/lib/user-api/api-config'
 import type { ProjectAgentOperationRegistryDraft } from '@/lib/operations/types'
 import { defineOperation } from '@/lib/operations/define-operation'
 import { capabilitySelectionCommandSchema } from '@/lib/ai-registry/capability-selection-command'
+import { parseModelKeyStrict } from '@/lib/ai-registry/selection'
 
-const modelKeySchema = z.string().regex(/^(?:$|[^:]+::.+)$/)
+// Provider identities may carry an instance suffix (provider:instance::modelId),
+// so the key is parsed with the canonical separator instead of matched on a
+// colon-free provider prefix.
+const modelKeySchema = z.string().trim()
+  .refine((value) => value === '' || parseModelKeyStrict(value)?.modelKey === value, {
+    message: 'ASSISTANT_MODEL_KEY_INVALID',
+  })
   .describe('Exact provider::modelId key of the Assistant model. Pass an empty string to clear it.')
 
 const apiConfigInputSchema = z.object({
