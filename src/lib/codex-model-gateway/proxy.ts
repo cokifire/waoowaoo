@@ -28,7 +28,6 @@ import {
   chatCompletionToResponsesStream,
   responsesToChatCompletion,
 } from './chat-completions-bridge'
-import { getProviderKey } from '@/lib/ai-registry/selection'
 
 const CODEX_MODEL_REQUEST_MAX_BYTES = 16 * 1024 * 1024
 
@@ -374,7 +373,7 @@ export async function proxyCodexResponsesRequest(params: {
     upstreamModelId: upstream.modelId,
   })
   const { body } = providerRequest
-  const useChatCompletionsBridge = getProviderKey(upstream.provider).toLowerCase() === 'openai-compatible'
+  const useChatCompletionsBridge = upstream.providerKey === 'openai-compatible'
   const outboundBody = useChatCompletionsBridge
     ? Buffer.from(JSON.stringify(responsesToChatCompletion(modelRequest.parsed)), 'utf8')
     : body
@@ -388,7 +387,7 @@ export async function proxyCodexResponsesRequest(params: {
     userId: scope.userId,
     turnId: activeTurn.turnId,
     runtimeAttempt: activeTurn.attempt,
-    providerKey: 'openrouter',
+    providerKey: upstream.providerKey,
     modelKey: upstream.modelKey,
     requestHash: createHash('sha256')
       .update(outboundBody)
@@ -433,7 +432,7 @@ export async function proxyCodexResponsesRequest(params: {
       params.request.signal.throwIfAborted()
     }
     const sourceFailure = projectProviderCredentialOwnership(
-      resolveAiProviderAdapter('openrouter').failure.normalize({
+      resolveAiProviderAdapter(upstream.providerKey).failure.normalize({
         error,
         phase: 'submit',
         operation: EXTERNAL_OPERATION.PROVIDER_SUBMIT,
@@ -482,10 +481,10 @@ export async function proxyCodexResponsesRequest(params: {
   }
   let projection: Awaited<ReturnType<typeof projectCodexProviderResponse>>
   try {
-    projection = await projectCodexProviderResponse(response)
+    projection = await projectCodexProviderResponse(response, upstream.providerKey)
   } catch (error: unknown) {
     const sourceFailure = projectProviderCredentialOwnership(
-      resolveAiProviderAdapter('openrouter').failure.normalize({
+      resolveAiProviderAdapter(upstream.providerKey).failure.normalize({
         error,
         phase: 'result',
         operation: EXTERNAL_OPERATION.PROVIDER_SUBMIT,

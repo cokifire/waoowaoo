@@ -131,7 +131,7 @@ async function startGatewayServer(): Promise<{
           'X-Request-Id': `smoke-${selected.name}`,
         },
       })
-      const projected = await projectCodexProviderResponse(providerResponse)
+      const projected = await projectCodexProviderResponse(providerResponse, 'openrouter')
       const body = Buffer.from(await projected.response.arrayBuffer())
       response.writeHead(
         projected.response.status,

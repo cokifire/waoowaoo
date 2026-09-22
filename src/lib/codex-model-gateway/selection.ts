@@ -1,3 +1,4 @@
+import { getProviderKey } from '@/lib/ai-registry/selection'
 import { resolveLlmRuntimeModel } from '@/lib/ai-exec/llm-runtime'
 import { getUserModelConfig } from '@/lib/config-service'
 import { getProviderConfig } from '@/lib/user-api/runtime-config'
@@ -131,6 +132,7 @@ export async function resolveCodexModelGatewayUpstream(
 ): Promise<{
   readonly runtimeModelId: string
   readonly provider: string
+  readonly providerKey: string
   readonly modelId: string
   readonly modelKey: string
   readonly responsesEndpoint: string
@@ -139,9 +141,14 @@ export async function resolveCodexModelGatewayUpstream(
 }> {
   const scope = normalizeCodexModelGatewayScope(scopeValue)
   const resolved = await resolveSelectedAssistantModel(scope)
+  const providerKey = getProviderKey(resolved.selection.provider).toLowerCase()
+  if (!providerKey) {
+    throw new CodexModelGatewayError('ASSISTANT_MODEL_UNSUPPORTED', 422)
+  }
   return {
     runtimeModelId: resolveCodexRuntimeModelId(resolved.selection.modelId),
     provider: resolved.selection.provider,
+    providerKey,
     modelId: resolved.selection.modelId,
     modelKey: resolved.selection.modelKey,
     responsesEndpoint: resolved.responsesEndpoint,
